@@ -1,3 +1,3 @@
-module github.com/lucidfrontier45/lzb
+module github.com/lucidfrontier45/lzpb
 
 go 1.25

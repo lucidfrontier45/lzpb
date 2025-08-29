@@ -1,4 +1,4 @@
-# lzb: Build AWS Lambda Zip Deploy Package
+# lzpb: Build AWS Lambda Zip Deploy Package
 
 ## Why
 
@@ -17,7 +17,7 @@ The principle is quite simple. The ZIP archive format allows you to specify perm
 
 ## Usage
 
-1. Get the latest preubilt binary of your platform from https://github.com/lucidfrontier45/lzb/releases .
+1. Get the latest preubilt binary of your platform from https://github.com/lucidfrontier45/lzpb/releases .
 2. Place the binary to a directory that is included in your `PATH`
 3. run `lsb <package_dir> <output_zip_file>`
 
@@ -26,5 +26,5 @@ The principle is quite simple. The ZIP archive format allows you to specify perm
 The program is writen in Golang. It's a single file program, contains only around 100 lines, and can be easily compiled to any target platforms.
 
 ```sh
-go build -o lzb main.go
+go build -o lzpb main.go
 ```

@@ -126,7 +126,7 @@ func main() {
 	// get cmd arguments
 	args := os.Args
 	if len(args) < 3 {
-		fmt.Println("Usage: lzb <source_dir> <target_zip>")
+		fmt.Println("Usage: lzpb <source_dir> <target_zip>")
 		return
 	}
 	sourceDir := args[1]
