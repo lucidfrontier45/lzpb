@@ -19,7 +19,7 @@ The principle is quite simple. The ZIP archive format allows you to specify perm
 
 1. Get the latest preubilt binary of your platform from https://github.com/lucidfrontier45/lzpb/releases .
 2. Place the binary to a directory that is included in your `PATH`
-3. run `lsb <package_dir> <output_zip_file>`
+3. run `lspb <package_dir> <output_zip_file>`
 
 ## Develop
 
