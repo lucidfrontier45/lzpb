@@ -29,11 +29,19 @@ func zipDirectory(sourceDir, targetZipFile string) error {
 	if err != nil {
 		return err
 	}
-	defer zipFile.Close()
+	defer func() {
+		if err := zipFile.Close(); err != nil {
+			fmt.Fprintln(os.Stderr, "Error closing zip file:", err)
+		}
+	}()
 
 	// 2. Initialize a new zip.Writer to write to the zip file.
 	zipWriter := zip.NewWriter(zipFile)
-	defer zipWriter.Close()
+	defer func() {
+		if err := zipWriter.Close(); err != nil {
+			fmt.Fprintln(os.Stderr, "Error closing zip writer:", err)
+		}
+	}()
 
 	// Use the clean path of the source directory as the base.
 	baseDir := filepath.Clean(sourceDir)
@@ -73,7 +81,7 @@ func zipDirectory(sourceDir, targetZipFile string) error {
 			// 6. Grant executable permissions to "run.sh" and "bootstrap".
 			if info.Name() == RUN_SH || info.Name() == BOOTSTRAP {
 				// Set the file mode to 0755 (rwxr-xr-x).
-				header.SetMode(0755)
+				header.SetMode(0o755)
 			}
 		}
 
@@ -89,7 +97,11 @@ func zipDirectory(sourceDir, targetZipFile string) error {
 			if err != nil {
 				return err
 			}
-			defer file.Close()
+			defer func() {
+				if err := file.Close(); err != nil {
+					fmt.Fprintln(os.Stderr, "Error closing file:", err)
+				}
+			}()
 
 			// If the file is "run.sh", convert its line endings to LF before writing.
 			if info.Name() == RUN_SH {
@@ -131,5 +143,8 @@ func main() {
 	}
 	sourceDir := args[1]
 	targetZip := args[2]
-	zipDirectory(sourceDir, targetZip)
+	if err := zipDirectory(sourceDir, targetZip); err != nil {
+		fmt.Fprintln(os.Stderr, "Error creating zip file:", err)
+		return
+	}
 }
