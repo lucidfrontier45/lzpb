@@ -44,7 +44,7 @@ func parseExecFiles(execFiles string) []string {
 	return result
 }
 
-func init() {
+func initFlags() {
 	flag.StringVar(
 		&opts.execFiles,
 		"exec",
@@ -209,6 +209,7 @@ func zipDirectory(sourceDir, targetZipFile string, execFiles, lfFiles []string) 
 }
 
 func main() {
+	initFlags()
 	flag.Parse()
 	// get cmd arguments
 	args := flag.Args()
