@@ -100,7 +100,7 @@ func TestZipDirectory(t *testing.T) {
 		}
 
 		zipPath := filepath.Join(tmpDir, "out.zip")
-		err := zipDirectory(srcDir, zipPath, []string{"script.sh"})
+		err := zipDirectory(srcDir, zipPath, []string{"script.sh"}, []string{"run.sh"})
 		if err != nil {
 			t.Fatalf("zipDirectory failed: %v", err)
 		}
@@ -138,7 +138,7 @@ func TestZipDirectory(t *testing.T) {
 		}
 
 		zipPath := filepath.Join(tmpDir, "out.zip")
-		err := zipDirectory(srcDir, zipPath, []string{"bootstrap", "run.sh"})
+		err := zipDirectory(srcDir, zipPath, []string{"bootstrap", "run.sh"}, []string{"run.sh"})
 		if err != nil {
 			t.Fatalf("zipDirectory failed: %v", err)
 		}
@@ -177,7 +177,7 @@ func TestZipDirectory(t *testing.T) {
 		}
 
 		zipPath := filepath.Join(tmpDir, "out.zip")
-		err := zipDirectory(srcDir, zipPath, []string{"bootstrap", "run.sh"})
+		err := zipDirectory(srcDir, zipPath, []string{"bootstrap", "run.sh"}, []string{"run.sh"})
 		if err != nil {
 			t.Fatalf("zipDirectory failed: %v", err)
 		}
@@ -209,7 +209,7 @@ func TestZipDirectory(t *testing.T) {
 		}
 
 		zipPath := filepath.Join(tmpDir, "out.zip")
-		err := zipDirectory(srcDir, zipPath, []string{})
+		err := zipDirectory(srcDir, zipPath, []string{}, []string{})
 		if err != nil {
 			t.Fatalf("zipDirectory failed: %v", err)
 		}
