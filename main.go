@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	VERSION         = "0.2.0"
+	VERSION         = "0.2.1"
 	RUN_SH          = "run.sh"
 	BOOTSTRAP       = "bootstrap"
 	DEFAULT_EXEC    = "bootstrap,run.sh"
