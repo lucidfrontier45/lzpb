@@ -38,12 +38,8 @@ The system SHALL set file mode to 0755 (owner read/write/execute, group/others r
 - **WHEN** user specifies a file via --exec
 - **THEN** the file mode includes others execute permission (bit 0001)
 
-### Requirement: Invalid --exec input is rejected
-The system SHALL validate --exec input and report errors for invalid file specifications.
-
-#### Scenario: Empty --exec value is rejected
-- **WHEN** user runs `lzpb pack --exec ""`
-- **THEN** the system reports an error indicating no files were specified
+### Requirement: Non-existent files show warning
+The system SHALL warn about files specified via --exec that are not found in the source directory, but SHALL still create the archive.
 
 #### Scenario: Non-existent file shows warning
 - **WHEN** user runs `lzpb pack --exec "nonexistent.sh"`

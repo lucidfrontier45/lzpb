@@ -202,13 +202,6 @@ func main() {
 	sourceDir := args[0]
 	targetZip := args[1]
 	execFiles := parseExecFiles(opts.execFiles)
-	if opts.execFiles == "" && len(execFiles) == 0 {
-		fmt.Fprintln(
-			os.Stderr,
-			"Error: --exec value is empty, no files will receive executable permissions",
-		)
-		return
-	}
 	if err := zipDirectory(sourceDir, targetZip, execFiles); err != nil {
 		fmt.Fprintln(os.Stderr, "Error creating zip file:", err)
 		return
