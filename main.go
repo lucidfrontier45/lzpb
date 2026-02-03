@@ -85,7 +85,7 @@ func zipDirectory(sourceDir, targetZipFile string, execFiles []string) error {
 	foundExecFiles := make(map[string]bool)
 
 	// 3. Walk through all the files and directories recursively.
-	return filepath.Walk(baseDir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(baseDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -173,8 +173,22 @@ func zipDirectory(sourceDir, targetZipFile string, execFiles []string) error {
 
 		return nil
 	})
+	if err != nil {
+		return err
+	}
 
 	// Warn about exec files that were not found in the source directory.
+	for _, execFile := range execFiles {
+		if !foundExecFiles[execFile] {
+			fmt.Fprintf(
+				os.Stderr,
+				"Warning: exec file '%s' not found in source directory\n",
+				execFile,
+			)
+		}
+	}
+
+	return nil
 }
 
 func main() {
@@ -188,6 +202,13 @@ func main() {
 	sourceDir := args[0]
 	targetZip := args[1]
 	execFiles := parseExecFiles(opts.execFiles)
+	if opts.execFiles == "" && len(execFiles) == 0 {
+		fmt.Fprintln(
+			os.Stderr,
+			"Error: --exec value is empty, no files will receive executable permissions",
+		)
+		return
+	}
 	if err := zipDirectory(sourceDir, targetZip, execFiles); err != nil {
 		fmt.Fprintln(os.Stderr, "Error creating zip file:", err)
 		return

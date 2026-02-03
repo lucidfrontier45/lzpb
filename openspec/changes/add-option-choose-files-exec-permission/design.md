@@ -27,7 +27,7 @@ lzpb is a command-line tool for creating and extracting lzip-based archives. Cur
 
 5. **Default value: `bootstrap,run.sh`** - For backward compatibility, the --exec option defaults to `bootstrap,run.sh`. This ensures existing workflows continue to work without requiring users to explicitly specify the option. Users can override by providing a custom value or set `--exec=""` to disable.
 
-5. **Permission mode: 0755** - Use standard Unix permission (owner read/write/execute, group/others read/execute). This is the most common use case for packaged executables.
+6. **Permission mode: 0755** - Use standard Unix permission (owner read/write/execute, group/others read/execute). This is the most common use case for packaged executables.
 
 ## Risks / Trade-offs
 
