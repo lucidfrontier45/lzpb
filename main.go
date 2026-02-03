@@ -5,25 +5,60 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const (
-	VERSION   = "0.1.1"
-	RUN_SH    = "run.sh"
-	BOOTSTRAP = "bootstrap"
+	VERSION         = "0.1.1"
+	RUN_SH          = "run.sh"
+	BOOTSTRAP       = "bootstrap"
+	DEFAULT_EXEC    = "bootstrap,run.sh"
+	EXEC_PERMISSION = 0o755
 )
+
+type packOptions struct {
+	execFiles string
+}
+
+var opts = packOptions{
+	execFiles: DEFAULT_EXEC,
+}
+
+func parseExecFiles(execFiles string) []string {
+	if execFiles == "" {
+		return []string{}
+	}
+	parts := strings.Split(execFiles, ",")
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		trimmed := strings.TrimSpace(p)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
+func init() {
+	flag.StringVar(
+		&opts.execFiles,
+		"exec",
+		DEFAULT_EXEC,
+		"Comma-separated list of files to set executable permissions",
+	)
+}
 
 // zipDirectory compresses the entire contents of the sourceDir directory
 // into a zip file named targetZipFile.
 //
-// If files named "run.sh" or "bootstrap" are found, they are given
-// Unix executable permissions (0755).
-// The "run.sh" file will also have its line endings converted to LF.
-func zipDirectory(sourceDir, targetZipFile string) error {
+// If files are specified via --exec flag, they are given Unix executable
+// permissions (0755). The default is "bootstrap,run.sh".
+func zipDirectory(sourceDir, targetZipFile string, execFiles []string) error {
 	// 1. Create the target zip file. It will overwrite if it already exists.
 	zipFile, err := os.Create(targetZipFile)
 	if err != nil {
@@ -45,6 +80,9 @@ func zipDirectory(sourceDir, targetZipFile string) error {
 
 	// Use the clean path of the source directory as the base.
 	baseDir := filepath.Clean(sourceDir)
+
+	// Track which exec files were found for warning about missing files.
+	foundExecFiles := make(map[string]bool)
 
 	// 3. Walk through all the files and directories recursively.
 	return filepath.Walk(baseDir, func(path string, info os.FileInfo, err error) error {
@@ -78,10 +116,13 @@ func zipDirectory(sourceDir, targetZipFile string) error {
 			// If it's a file, set the compression method (Deflate is common).
 			header.Method = zip.Deflate
 
-			// 6. Grant executable permissions to "run.sh" and "bootstrap".
-			if info.Name() == RUN_SH || info.Name() == BOOTSTRAP {
-				// Set the file mode to 0755 (rwxr-xr-x).
-				header.SetMode(0o755)
+			// 6. Grant executable permissions to specified files.
+			for _, execFile := range execFiles {
+				if info.Name() == execFile {
+					header.SetMode(EXEC_PERMISSION)
+					foundExecFiles[execFile] = true
+					break
+				}
 			}
 		}
 
@@ -132,18 +173,22 @@ func zipDirectory(sourceDir, targetZipFile string) error {
 
 		return nil
 	})
+
+	// Warn about exec files that were not found in the source directory.
 }
 
 func main() {
+	flag.Parse()
 	// get cmd arguments
-	args := os.Args
-	if len(args) < 3 {
-		fmt.Println("Usage: lzpb <source_dir> <target_zip>")
+	args := flag.Args()
+	if len(args) < 2 {
+		fmt.Println("Usage: lzpb [--exec=files] <source_dir> <target_zip>")
 		return
 	}
-	sourceDir := args[1]
-	targetZip := args[2]
-	if err := zipDirectory(sourceDir, targetZip); err != nil {
+	sourceDir := args[0]
+	targetZip := args[1]
+	execFiles := parseExecFiles(opts.execFiles)
+	if err := zipDirectory(sourceDir, targetZip, execFiles); err != nil {
 		fmt.Fprintln(os.Stderr, "Error creating zip file:", err)
 		return
 	}
