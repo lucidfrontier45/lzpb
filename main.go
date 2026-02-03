@@ -44,6 +44,93 @@ func parseExecFiles(execFiles string) []string {
 	return result
 }
 
+func createFileHeader(info os.FileInfo, baseDir, path string) (*zip.FileHeader, error) {
+	header, err := zip.FileInfoHeader(info)
+	if err != nil {
+		return nil, err
+	}
+
+	relPath, err := filepath.Rel(baseDir, path)
+	if err != nil {
+		return nil, err
+	}
+	header.Name = filepath.ToSlash(relPath)
+
+	if info.IsDir() {
+		header.Name += "/"
+	} else {
+		header.Method = zip.Deflate
+	}
+
+	return header, nil
+}
+
+func applyExecutablePermission(header *zip.FileHeader, info os.FileInfo, execFiles []string) bool {
+	for _, execFile := range execFiles {
+		if info.Name() == execFile {
+			header.SetMode(EXEC_PERMISSION)
+			return true
+		}
+	}
+	return false
+}
+
+func shouldConvertLineEndings(info os.FileInfo, lfFiles []string) bool {
+	for _, lfFile := range lfFiles {
+		if info.Name() == lfFile {
+			return true
+		}
+	}
+	return false
+}
+
+func writeFileContent(writer io.Writer, path string, shouldConvertLF bool) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Fprintln(os.Stderr, "Error closing file:", err)
+		}
+	}()
+
+	if shouldConvertLF {
+		content, err := io.ReadAll(file)
+		if err != nil {
+			return err
+		}
+
+		crlf := []byte{'\r', '\n'}
+		lf := []byte{'\n'}
+		content = bytes.ReplaceAll(content, crlf, lf)
+
+		_, err = writer.Write(content)
+		if err != nil {
+			return err
+		}
+	} else {
+		_, err = io.Copy(writer, file)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func warnAboutMissingExecFiles(execFiles []string, foundExecFiles map[string]bool) {
+	for _, execFile := range execFiles {
+		if !foundExecFiles[execFile] {
+			fmt.Fprintf(
+				os.Stderr,
+				"Warning: exec file '%s' not found in source directory\n",
+				execFile,
+			)
+		}
+	}
+}
+
 func initFlags() {
 	flag.StringVar(
 		&opts.execFiles,
@@ -68,7 +155,6 @@ func initFlags() {
 // If files are specified via --lf flag, their line endings are converted
 // from CRLF to LF. The default is "run.sh".
 func zipDirectory(sourceDir, targetZipFile string, execFiles, lfFiles []string) error {
-	// 1. Create the target zip file. It will overwrite if it already exists.
 	zipFile, err := os.Create(targetZipFile)
 	if err != nil {
 		return err
@@ -79,7 +165,6 @@ func zipDirectory(sourceDir, targetZipFile string, execFiles, lfFiles []string) 
 		}
 	}()
 
-	// 2. Initialize a new zip.Writer to write to the zip file.
 	zipWriter := zip.NewWriter(zipFile)
 	defer func() {
 		if err := zipWriter.Close(); err != nil {
@@ -87,104 +172,36 @@ func zipDirectory(sourceDir, targetZipFile string, execFiles, lfFiles []string) 
 		}
 	}()
 
-	// Use the clean path of the source directory as the base.
 	baseDir := filepath.Clean(sourceDir)
-
-	// Track which exec files were found for warning about missing files.
 	foundExecFiles := make(map[string]bool)
 
-	// 3. Walk through all the files and directories recursively.
 	err = filepath.Walk(baseDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Don't include the source directory itself in the zip archive.
 		if path == baseDir {
 			return nil
 		}
 
-		// 4. Create a zip FileHeader from the FileInfo.
-		header, err := zip.FileInfoHeader(info)
+		header, err := createFileHeader(info, baseDir, path)
 		if err != nil {
 			return err
 		}
 
-		// 5. Set the file name in the header to be a relative path from the source directory.
-		relPath, err := filepath.Rel(baseDir, path)
-		if err != nil {
-			return err
-		}
-		// Use forward slashes for path separators for cross-platform compatibility.
-		header.Name = filepath.ToSlash(relPath)
-
-		if info.IsDir() {
-			// If it's a directory, add a trailing slash to the name.
-			header.Name += "/"
-		} else {
-			// If it's a file, set the compression method (Deflate is common).
-			header.Method = zip.Deflate
-
-			// 6. Grant executable permissions to specified files.
-			for _, execFile := range execFiles {
-				if info.Name() == execFile {
-					header.SetMode(EXEC_PERMISSION)
-					foundExecFiles[execFile] = true
-					break
-				}
-			}
+		if !info.IsDir() && applyExecutablePermission(header, info, execFiles) {
+			foundExecFiles[info.Name()] = true
 		}
 
-		// 7. Write the header to the zip writer.
 		writer, err := zipWriter.CreateHeader(header)
 		if err != nil {
 			return err
 		}
 
-		// 8. If it's not a directory, write the file's content.
 		if !info.IsDir() {
-			file, err := os.Open(path)
-			if err != nil {
+			shouldConvertLF := shouldConvertLineEndings(info, lfFiles)
+			if err := writeFileContent(writer, path, shouldConvertLF); err != nil {
 				return err
-			}
-			defer func() {
-				if err := file.Close(); err != nil {
-					fmt.Fprintln(os.Stderr, "Error closing file:", err)
-				}
-			}()
-
-			// Check if this file should have line endings converted.
-			shouldConvertLF := false
-			for _, lfFile := range lfFiles {
-				if info.Name() == lfFile {
-					shouldConvertLF = true
-					break
-				}
-			}
-
-			if shouldConvertLF {
-				// Read the entire file content into memory.
-				content, err := io.ReadAll(file)
-				if err != nil {
-					return err
-				}
-
-				// Replace CRLF (\r\n) with LF (\n).
-				crlf := []byte{'\r', '\n'}
-				lf := []byte{'\n'}
-				content = bytes.ReplaceAll(content, crlf, lf)
-
-				// Write the modified content to the zip archive.
-				_, err = writer.Write(content)
-				if err != nil {
-					return err
-				}
-			} else {
-				// For all other files, copy the content directly.
-				_, err = io.Copy(writer, file)
-				if err != nil {
-					return err
-				}
 			}
 		}
 
@@ -194,16 +211,7 @@ func zipDirectory(sourceDir, targetZipFile string, execFiles, lfFiles []string) 
 		return err
 	}
 
-	// Warn about exec files that were not found in the source directory.
-	for _, execFile := range execFiles {
-		if !foundExecFiles[execFile] {
-			fmt.Fprintf(
-				os.Stderr,
-				"Warning: exec file '%s' not found in source directory\n",
-				execFile,
-			)
-		}
-	}
+	warnAboutMissingExecFiles(execFiles, foundExecFiles)
 
 	return nil
 }
