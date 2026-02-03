@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -100,7 +101,7 @@ func TestZipDirectory(t *testing.T) {
 		}
 
 		zipPath := filepath.Join(tmpDir, "out.zip")
-		err := zipDirectory(srcDir, zipPath, []string{"script.sh"})
+		err := zipDirectory(srcDir, zipPath, []string{"script.sh"}, []string{"run.sh"})
 		if err != nil {
 			t.Fatalf("zipDirectory failed: %v", err)
 		}
@@ -138,7 +139,7 @@ func TestZipDirectory(t *testing.T) {
 		}
 
 		zipPath := filepath.Join(tmpDir, "out.zip")
-		err := zipDirectory(srcDir, zipPath, []string{"bootstrap", "run.sh"})
+		err := zipDirectory(srcDir, zipPath, []string{"bootstrap", "run.sh"}, []string{"run.sh"})
 		if err != nil {
 			t.Fatalf("zipDirectory failed: %v", err)
 		}
@@ -177,7 +178,7 @@ func TestZipDirectory(t *testing.T) {
 		}
 
 		zipPath := filepath.Join(tmpDir, "out.zip")
-		err := zipDirectory(srcDir, zipPath, []string{"bootstrap", "run.sh"})
+		err := zipDirectory(srcDir, zipPath, []string{"bootstrap", "run.sh"}, []string{"run.sh"})
 		if err != nil {
 			t.Fatalf("zipDirectory failed: %v", err)
 		}
@@ -209,13 +210,190 @@ func TestZipDirectory(t *testing.T) {
 		}
 
 		zipPath := filepath.Join(tmpDir, "out.zip")
-		err := zipDirectory(srcDir, zipPath, []string{})
+		err := zipDirectory(srcDir, zipPath, []string{}, []string{})
 		if err != nil {
 			t.Fatalf("zipDirectory failed: %v", err)
 		}
 
 		verifyZipPermissions(t, zipPath, "bootstrap", 0o644)
 		verifyZipPermissions(t, zipPath, "run.sh", 0o644)
+	})
+
+	t.Run("CRLF to LF conversion for single file", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		srcDir := filepath.Join(tmpDir, "src")
+		if err := os.MkdirAll(srcDir, 0o755); err != nil {
+			t.Fatalf("failed to create src dir: %v", err)
+		}
+
+		crlfContent := []byte("#!/bin/bash\r\necho hello\r\nexit 0\r\n")
+		if err := os.WriteFile(
+			filepath.Join(srcDir, "script.sh"),
+			crlfContent,
+			0o644,
+		); err != nil {
+			t.Fatalf("failed to create script.sh: %v", err)
+		}
+
+		zipPath := filepath.Join(tmpDir, "out.zip")
+		err := zipDirectory(srcDir, zipPath, []string{}, []string{"script.sh"})
+		if err != nil {
+			t.Fatalf("zipDirectory failed: %v", err)
+		}
+
+		verifyZipLineEndings(t, zipPath, "script.sh", []byte("#!/bin/bash\necho hello\nexit 0\n"))
+	})
+
+	t.Run("CRLF to LF conversion for multiple files", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		srcDir := filepath.Join(tmpDir, "src")
+		if err := os.MkdirAll(srcDir, 0o755); err != nil {
+			t.Fatalf("failed to create src dir: %v", err)
+		}
+
+		if err := os.WriteFile(
+			filepath.Join(srcDir, "run.sh"),
+			[]byte("#!/bin/bash\r\necho run\r\n"),
+			0o644,
+		); err != nil {
+			t.Fatalf("failed to create run.sh: %v", err)
+		}
+		if err := os.WriteFile(
+			filepath.Join(srcDir, "bootstrap.sh"),
+			[]byte("#!/bin/bash\r\necho bootstrap\r\n"),
+			0o644,
+		); err != nil {
+			t.Fatalf("failed to create bootstrap.sh: %v", err)
+		}
+		if err := os.WriteFile(
+			filepath.Join(srcDir, "config.mk"),
+			[]byte("CRLF=test\r\nLF=test\r\n"),
+			0o644,
+		); err != nil {
+			t.Fatalf("failed to create config.mk: %v", err)
+		}
+
+		zipPath := filepath.Join(tmpDir, "out.zip")
+		err := zipDirectory(
+			srcDir,
+			zipPath,
+			[]string{},
+			[]string{"run.sh", "bootstrap.sh", "config.mk"},
+		)
+		if err != nil {
+			t.Fatalf("zipDirectory failed: %v", err)
+		}
+
+		verifyZipLineEndings(t, zipPath, "run.sh", []byte("#!/bin/bash\necho run\n"))
+		verifyZipLineEndings(t, zipPath, "bootstrap.sh", []byte("#!/bin/bash\necho bootstrap\n"))
+		verifyZipLineEndings(t, zipPath, "config.mk", []byte("CRLF=test\nLF=test\n"))
+	})
+
+	t.Run("empty lf list disables conversion", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		srcDir := filepath.Join(tmpDir, "src")
+		if err := os.MkdirAll(srcDir, 0o755); err != nil {
+			t.Fatalf("failed to create src dir: %v", err)
+		}
+
+		crlfContent := []byte("#!/bin/bash\r\necho hello\r\n")
+		if err := os.WriteFile(
+			filepath.Join(srcDir, "script.sh"),
+			crlfContent,
+			0o644,
+		); err != nil {
+			t.Fatalf("failed to create script.sh: %v", err)
+		}
+
+		zipPath := filepath.Join(tmpDir, "out.zip")
+		err := zipDirectory(srcDir, zipPath, []string{}, []string{})
+		if err != nil {
+			t.Fatalf("zipDirectory failed: %v", err)
+		}
+
+		verifyZipLineEndings(t, zipPath, "script.sh", crlfContent)
+	})
+
+	t.Run("LF-only files unchanged", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		srcDir := filepath.Join(tmpDir, "src")
+		if err := os.MkdirAll(srcDir, 0o755); err != nil {
+			t.Fatalf("failed to create src dir: %v", err)
+		}
+
+		lfContent := []byte("#!/bin/bash\necho hello\nexit 0\n")
+		if err := os.WriteFile(
+			filepath.Join(srcDir, "script.sh"),
+			lfContent,
+			0o644,
+		); err != nil {
+			t.Fatalf("failed to create script.sh: %v", err)
+		}
+
+		zipPath := filepath.Join(tmpDir, "out.zip")
+		err := zipDirectory(srcDir, zipPath, []string{}, []string{"script.sh"})
+		if err != nil {
+			t.Fatalf("zipDirectory failed: %v", err)
+		}
+
+		verifyZipLineEndings(t, zipPath, "script.sh", lfContent)
+	})
+
+	t.Run("mixed CRLF and LF normalized to LF", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		srcDir := filepath.Join(tmpDir, "src")
+		if err := os.MkdirAll(srcDir, 0o755); err != nil {
+			t.Fatalf("failed to create src dir: %v", err)
+		}
+
+		mixedContent := []byte("#!/bin/bash\r\necho hello\nexit 0\r\n")
+		if err := os.WriteFile(
+			filepath.Join(srcDir, "script.sh"),
+			mixedContent,
+			0o644,
+		); err != nil {
+			t.Fatalf("failed to create script.sh: %v", err)
+		}
+
+		zipPath := filepath.Join(tmpDir, "out.zip")
+		err := zipDirectory(srcDir, zipPath, []string{}, []string{"script.sh"})
+		if err != nil {
+			t.Fatalf("zipDirectory failed: %v", err)
+		}
+
+		verifyZipLineEndings(t, zipPath, "script.sh", []byte("#!/bin/bash\necho hello\nexit 0\n"))
+	})
+
+	t.Run("non-listed files not converted", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		srcDir := filepath.Join(tmpDir, "src")
+		if err := os.MkdirAll(srcDir, 0o755); err != nil {
+			t.Fatalf("failed to create src dir: %v", err)
+		}
+
+		if err := os.WriteFile(
+			filepath.Join(srcDir, "run.sh"),
+			[]byte("#!/bin/bash\r\necho run\r\n"),
+			0o644,
+		); err != nil {
+			t.Fatalf("failed to create run.sh: %v", err)
+		}
+		if err := os.WriteFile(
+			filepath.Join(srcDir, "other.sh"),
+			[]byte("#!/bin/bash\r\necho other\r\n"),
+			0o644,
+		); err != nil {
+			t.Fatalf("failed to create other.sh: %v", err)
+		}
+
+		zipPath := filepath.Join(tmpDir, "out.zip")
+		err := zipDirectory(srcDir, zipPath, []string{}, []string{"run.sh"})
+		if err != nil {
+			t.Fatalf("zipDirectory failed: %v", err)
+		}
+
+		verifyZipLineEndings(t, zipPath, "run.sh", []byte("#!/bin/bash\necho run\n"))
+		verifyZipLineEndings(t, zipPath, "other.sh", []byte("#!/bin/bash\r\necho other\r\n"))
 	})
 }
 
@@ -247,6 +425,46 @@ func verifyZipPermissions(t *testing.T, zipPath, filename string, expectedMode o
 					unixAttrs,
 					hasExec,
 					expectedHasExec,
+				)
+			}
+			return
+		}
+	}
+	t.Errorf("file %s not found in zip", filename)
+}
+
+func verifyZipLineEndings(t *testing.T, zipPath, filename string, expectedContent []byte) {
+	t.Helper()
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		t.Fatalf("failed to open zip: %v", err)
+	}
+	defer func() {
+		if err := r.Close(); err != nil {
+			t.Errorf("error closing zip: %v", err)
+		}
+	}()
+
+	for _, f := range r.File {
+		if f.Name == filename {
+			rc, err := f.Open()
+			if err != nil {
+				t.Fatalf("failed to open %s in zip: %v", filename, err)
+			}
+			content, err := io.ReadAll(rc)
+			if err := rc.Close(); err != nil {
+				t.Fatalf("failed to close %s in zip: %v", filename, err)
+			}
+			if err != nil {
+				t.Fatalf("failed to read %s from zip: %v", filename, err)
+			}
+
+			if string(content) != string(expectedContent) {
+				t.Errorf(
+					"file %s content mismatch\n got: %q\nwant: %q",
+					filename,
+					string(content),
+					string(expectedContent),
 				)
 			}
 			return

@@ -23,10 +23,12 @@ const (
 
 type packOptions struct {
 	execFiles string
+	lfFiles   string
 }
 
 var opts = packOptions{
 	execFiles: DEFAULT_EXEC,
+	lfFiles:   RUN_SH,
 }
 
 func parseExecFiles(execFiles string) []string {
@@ -51,6 +53,12 @@ func init() {
 		DEFAULT_EXEC,
 		"Comma-separated list of files to set executable permissions",
 	)
+	flag.StringVar(
+		&opts.lfFiles,
+		"lf",
+		RUN_SH,
+		"Comma-separated list of files to convert CRLF line endings to LF",
+	)
 }
 
 // zipDirectory compresses the entire contents of the sourceDir directory
@@ -58,7 +66,10 @@ func init() {
 //
 // If files are specified via --exec flag, they are given Unix executable
 // permissions (0755). The default is "bootstrap,run.sh".
-func zipDirectory(sourceDir, targetZipFile string, execFiles []string) error {
+//
+// If files are specified via --lf flag, their line endings are converted
+// from CRLF to LF. The default is "run.sh".
+func zipDirectory(sourceDir, targetZipFile string, execFiles, lfFiles []string) error {
 	// 1. Create the target zip file. It will overwrite if it already exists.
 	zipFile, err := os.Create(targetZipFile)
 	if err != nil {
@@ -144,8 +155,16 @@ func zipDirectory(sourceDir, targetZipFile string, execFiles []string) error {
 				}
 			}()
 
-			// If the file is "run.sh", convert its line endings to LF before writing.
-			if info.Name() == RUN_SH {
+			// Check if this file should have line endings converted.
+			shouldConvertLF := false
+			for _, lfFile := range lfFiles {
+				if info.Name() == lfFile {
+					shouldConvertLF = true
+					break
+				}
+			}
+
+			if shouldConvertLF {
 				// Read the entire file content into memory.
 				content, err := io.ReadAll(file)
 				if err != nil {
@@ -196,13 +215,14 @@ func main() {
 	// get cmd arguments
 	args := flag.Args()
 	if len(args) < 2 {
-		fmt.Println("Usage: lzpb [--exec=files] <source_dir> <target_zip>")
+		fmt.Println("Usage: lzpb [--exec=files] [--lf=files] <source_dir> <target_zip>")
 		return
 	}
 	sourceDir := args[0]
 	targetZip := args[1]
 	execFiles := parseExecFiles(opts.execFiles)
-	if err := zipDirectory(sourceDir, targetZip, execFiles); err != nil {
+	lfFiles := parseExecFiles(opts.lfFiles)
+	if err := zipDirectory(sourceDir, targetZip, execFiles, lfFiles); err != nil {
 		fmt.Fprintln(os.Stderr, "Error creating zip file:", err)
 		return
 	}
