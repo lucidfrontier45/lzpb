@@ -26,6 +26,9 @@ The principle is quite simple. The ZIP archive format allows you to specify perm
 - `--exec`: Comma-separated list of files to set executable permissions (default: "bootstrap,run.sh")
   - Use `--exec="file1,file2"` to specify custom files
   - Use `--exec=""` to disable exec permissions entirely
+- `--lf`: Comma-separated list of files to convert CRLF line endings to LF (default: "run.sh")
+  - Use `--lf="file1,file2"` to specify custom files
+  - Use `--lf=""` to disable line ending conversion entirely
 
 ## Develop
 
