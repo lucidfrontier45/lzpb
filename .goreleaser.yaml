@@ -3,7 +3,7 @@ project_name: lzpb
 
 before:
   hooks:
-    - go mod tidy
+    - go mod verify
 
 builds:
   - main: .
