@@ -25,7 +25,10 @@ type packOptions struct {
 
 var VERSION = "dev"
 
-var versionFlag bool
+var (
+	versionFlag bool
+	helpFlag    bool
+)
 
 var opts = packOptions{
 	execFiles: DEFAULT_EXEC,
@@ -154,6 +157,8 @@ func initFlags() {
 		RUN_SH,
 		"Comma-separated list of files to convert CRLF line endings to LF",
 	)
+	flag.BoolVar(&helpFlag, "h", false, "Show this help message")
+	flag.BoolVar(&helpFlag, "help", false, "Show this help message")
 }
 
 // zipDirectory compresses the entire contents of the sourceDir directory
@@ -253,6 +258,11 @@ Examples:
 func main() {
 	initFlags()
 	flag.Parse()
+
+	if helpFlag {
+		printUsage()
+		return
+	}
 
 	if versionFlag {
 		fmt.Println(VERSION)
