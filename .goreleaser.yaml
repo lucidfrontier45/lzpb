@@ -1,0 +1,40 @@
+version: 2
+project_name: lzpb
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: .
+    binary: lzpb
+    ldflags:
+      - -s -w -X main.VERSION={{ .Version }}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+      - goos: darwin
+        goarch: amd64
+
+archives:
+  - formats: [binary]
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"

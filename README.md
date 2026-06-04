@@ -32,8 +32,25 @@ The principle is quite simple. The ZIP archive format allows you to specify perm
 
 ## Develop
 
-The program is writen in Golang. It's a single file program, contains only around 100 lines, and can be easily compiled to any target platforms.
+The program is written in Go with zero external dependencies. Build from source:
 
 ```sh
-go build -o lzpb main.go
+go build -o lzpb .
 ```
+
+### Release (maintainers only)
+
+Releases are automated via [GoReleaser](https://goreleaser.com). To publish a new release:
+
+1. Tag the commit and push:
+   ```sh
+   git tag v0.3.0
+   git push origin v0.3.0
+   ```
+2. GitHub Actions builds binaries for all supported platforms (linux/amd64, linux/arm64, darwin/arm64, windows/amd64), generates checksums, creates a GitHub release, and uploads the artifacts.
+
+For a local test build without publishing:
+```sh
+goreleaser release --snapshot --clean
+```
+Binaries appear under `dist/`.

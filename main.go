@@ -12,7 +12,6 @@ import (
 )
 
 const (
-	VERSION         = "0.2.1"
 	RUN_SH          = "run.sh"
 	BOOTSTRAP       = "bootstrap"
 	DEFAULT_EXEC    = "bootstrap,run.sh"
@@ -23,6 +22,10 @@ type packOptions struct {
 	execFiles string
 	lfFiles   string
 }
+
+var VERSION = "dev"
+
+var versionFlag bool
 
 var opts = packOptions{
 	execFiles: DEFAULT_EXEC,
@@ -132,6 +135,13 @@ func warnAboutMissingExecFiles(execFiles []string, foundExecFiles map[string]boo
 }
 
 func initFlags() {
+	flag.Usage = printUsage
+	flag.BoolVar(
+		&versionFlag,
+		"version",
+		false,
+		"Print version and exit",
+	)
 	flag.StringVar(
 		&opts.execFiles,
 		"exec",
@@ -216,13 +226,43 @@ func zipDirectory(sourceDir, targetZipFile string, execFiles, lfFiles []string) 
 	return nil
 }
 
+func printUsage() {
+	fmt.Println(`lzpb — lightweight zip packer for Lambda-style deployments
+
+Pack a source directory into a zip file, with control over executable
+permissions and line-ending conversion for deployment-ready archives.
+
+Usage:
+  lzpb [flags] <source_dir> <target_zip>
+
+Flags:
+  -exec string
+        Comma-separated list of files to set executable permissions (default "bootstrap,run.sh")
+  -lf string
+        Comma-separated list of files to convert CRLF line endings to LF (default "run.sh")
+  -version
+        Print version and exit
+  -h     Show this help message
+
+Examples:
+  lzpb ./my-lambda ./deploy.zip
+  lzpb --exec=bootstrap,mybin ./src ./output.zip
+  lzpb --lf=run.sh,script.sh ./src ./out.zip`)
+}
+
 func main() {
 	initFlags()
 	flag.Parse()
+
+	if versionFlag {
+		fmt.Println(VERSION)
+		return
+	}
+
 	// get cmd arguments
 	args := flag.Args()
 	if len(args) < 2 {
-		fmt.Println("Usage: lzpb [--exec=files] [--lf=files] <source_dir> <target_zip>")
+		printUsage()
 		return
 	}
 	sourceDir := args[0]
